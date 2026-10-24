@@ -154,7 +154,7 @@
             transition: stroke-dashoffset 1s var(--ease-out-expo);
             transform: rotate(-90deg);
             transform-origin: 50% 50%;
-        }
+        } 
 
         /* View Transition */
         #main-content {
