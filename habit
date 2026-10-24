@@ -1,0 +1,1461 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Aura Habits — Premium Tracker</title>
+    
+    <!-- Google Fonts: Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                    colors: {
+                        background: '#09090b',
+                        surface: '#18181b',
+                        surfaceHover: '#27272a',
+                        border: '#3f3f46',
+                        accent: {
+                            cyan: '#06b6d4',
+                            purple: '#a855f7',
+                            emerald: '#10b981',
+                            rose: '#f43f5e',
+                            amber: '#f59e0b'
+                        }
+                    },
+                    animation: {
+                        'fade-in': 'fadeIn 0.3s ease-out forwards',
+                        'slide-up': 'slideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards',
+                        'float': 'float 6s ease-in-out infinite',
+                    },
+                    keyframes: {
+                        fadeIn: {
+                            '0%': { opacity: '0', transform: 'scale(0.98)' },
+                            '100%': { opacity: '1', transform: 'scale(1)' },
+                        },
+                        slideUp: {
+                            '0%': { transform: 'translateY(100%)' },
+                            '100%': { transform: 'translateY(0)' },
+                        },
+                        float: {
+                            '0%, 100%': { transform: 'translateY(0)' },
+                            '50%': { transform: 'translateY(-10px)' },
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    
+    <!-- Font Awesome -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Canvas Confetti -->
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+    <!-- SortableJS -->
+    <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
+
+    <style>
+        :root {
+            --ease-spring: cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        body { 
+            background-color: theme('colors.background');
+            color: #f4f4f5;
+            -webkit-tap-highlight-color: transparent; 
+            overscroll-behavior-y: none;
+            user-select: none;
+        }
+        
+        .hide-scrollbar::-webkit-scrollbar { display: none; }
+        .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+        /* Keyboard accessibility */
+        button:focus-visible, textarea:focus-visible, input:focus-visible {
+            outline: 2px solid #06b6d4;
+            outline-offset: 2px;
+        }
+
+        /* Ambient Background Glows */
+        .ambient-glow {
+            position: fixed;
+            border-radius: 50%;
+            filter: blur(80px);
+            z-index: -1;
+            opacity: 0.15;
+            pointer-events: none;
+        }
+        .glow-1 { top: -10%; left: -10%; width: 300px; height: 300px; background: theme('colors.accent.cyan'); }
+        .glow-2 { bottom: 10%; right: -10%; width: 400px; height: 400px; background: theme('colors.accent.purple'); }
+
+        /* Glassmorphism Utilities */
+        .glass-panel {
+            background: rgba(24, 24, 27, 0.65);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
+        }
+        .glass-button {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            transition: all 0.2s ease;
+        }
+        .glass-button:hover, .glass-button:active {
+            background: rgba(255, 255, 255, 0.1);
+            border-color: rgba(255, 255, 255, 0.2);
+        }
+
+        /* Swipe Container logic */
+        .swipe-container {
+            position: relative;
+            overflow: hidden;
+            border-radius: 1rem;
+            background: #18181b;
+        }
+        .swipe-bg-left {
+            background: linear-gradient(90deg, #10b981 0%, rgba(16,185,129,0.2) 100%);
+        }
+        .swipe-bg-right {
+            background: linear-gradient(270deg, #f43f5e 0%, rgba(244,63,94,0.2) 100%);
+        }
+        .swipe-item {
+            transition: transform 0.4s var(--ease-out-expo);
+            will-change: transform;
+            touch-action: pan-y;
+        }
+        .swipe-item.dragging { transition: none; }
+
+        /* Sortable styles */
+        .sortable-ghost { opacity: 0.2; }
+        .sortable-drag {
+            cursor: grabbing !important;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5);
+            transform: scale(1.02);
+            z-index: 50;
+        }
+
+        /* SVG Progress Ring */
+        .progress-ring__circle {
+            transition: stroke-dashoffset 1s var(--ease-out-expo);
+            transform: rotate(-90deg);
+            transform-origin: 50% 50%;
+        }
+
+        /* View Transition */
+        #main-content {
+            transition: opacity 0.2s ease, transform 0.2s ease;
+        }
+        .view-leave { opacity: 0; transform: scale(0.98); }
+        .view-enter { opacity: 1; transform: scale(1); }
+    </style>
+</head>
+<body class="antialiased h-screen w-full overflow-hidden flex flex-col relative">
+
+    <!-- Ambient Background -->
+    <div class="ambient-glow glow-1"></div>
+    <div class="ambient-glow glow-2"></div>
+
+    <!-- Mobile Frame Limiter -->
+    <div class="mx-auto w-full max-w-md h-full flex flex-col relative sm:border-x sm:border-white/5 shadow-2xl bg-background/50 backdrop-blur-3xl">
+
+        <!-- Toast Container -->
+        <div id="toast-container" class="fixed top-4 left-1/2 -translate-x-1/2 z-[100] flex flex-col items-center gap-2 pointer-events-none w-full max-w-[90%]"></div>
+
+        <!-- Header -->
+        <header class="pt-6 pb-4 px-6 z-30 flex justify-between items-center">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-2xl bg-gradient-to-br from-cyan-400 to-purple-600 p-[1px]">
+                    <div class="w-full h-full rounded-2xl bg-background flex items-center justify-center text-white">
+                        <i class="fa-solid fa-infinity text-sm bg-clip-text text-transparent bg-gradient-to-br from-cyan-400 to-purple-600"></i>
+                    </div>
+                </div>
+                <div>
+                    <h1 class="text-sm font-extrabold tracking-wide text-white">Aura</h1>
+                    <p class="text-[10px] text-zinc-400 font-medium uppercase tracking-widest" id="greeting">Welcome Back</p>
+                </div>
+            </div>
+
+            <div class="flex items-center gap-2">
+                <button onclick="window.switchTab('insights')" class="glass-button flex items-center gap-1.5 px-3 py-1.5 rounded-full" title="XP & Badges" aria-label="Level and badges">
+                    <i class="fa-solid fa-star text-[10px] text-amber-400"></i>
+                    <span id="header-level" class="text-xs font-bold text-white">Lvl 1</span>
+                </button>
+                <button onclick="window.toggleNotifications()" id="btn-notifications" class="glass-button w-9 h-9 flex items-center justify-center rounded-full text-zinc-400 hover:text-white" aria-label="Notifications">
+                    <i class="fa-regular fa-bell text-sm"></i>
+                </button>
+            </div>
+        </header>
+
+        <!-- Main Content Area -->
+        <main class="flex-1 overflow-y-auto overflow-x-hidden px-5 pb-28 relative hide-scrollbar view-enter" id="main-content"></main>
+
+        <!-- Floating Action Button -->
+        <button id="fab-add" onclick="window.openHabitModal()" class="absolute bottom-24 right-5 w-14 h-14 bg-gradient-to-tr from-cyan-500 to-purple-500 text-white rounded-full shadow-[0_0_20px_rgba(6,182,212,0.4)] flex items-center justify-center text-xl hover:scale-105 active:scale-95 z-40 transition-transform" aria-label="New ritual">
+            <i class="fa-solid fa-plus"></i>
+        </button>
+
+        <!-- Floating Pill Navigation -->
+        <div class="absolute bottom-6 left-1/2 -translate-x-1/2 w-[90%] z-40 pointer-events-none">
+            <nav class="glass-panel rounded-full p-1.5 flex items-center justify-between pointer-events-auto h-16 shadow-2xl">
+                <button onclick="window.switchTab('dashboard')" class="nav-btn relative flex-1 h-full rounded-full flex flex-col items-center justify-center gap-0.5 transition-all text-white" data-tab="dashboard">
+                    <div class="nav-indicator absolute inset-0 bg-white/10 rounded-full transition-opacity opacity-100"></div>
+                    <i class="fa-solid fa-layer-group text-[15px] z-10 transition-transform scale-110 text-cyan-400"></i>
+                    <span class="text-[9px] font-bold tracking-wide z-10">Today</span>
+                </button>
+                <button onclick="window.switchTab('calendar')" class="nav-btn relative flex-1 h-full rounded-full flex flex-col items-center justify-center gap-0.5 transition-all text-zinc-500 hover:text-zinc-300" data-tab="calendar">
+                    <div class="nav-indicator absolute inset-0 bg-white/10 rounded-full transition-opacity opacity-0"></div>
+                    <i class="fa-regular fa-calendar text-[15px] z-10 transition-transform"></i>
+                    <span class="text-[9px] font-bold tracking-wide z-10">Calendar</span>
+                </button>
+                <button onclick="window.switchTab('insights')" class="nav-btn relative flex-1 h-full rounded-full flex flex-col items-center justify-center gap-0.5 transition-all text-zinc-500 hover:text-zinc-300" data-tab="insights">
+                    <div class="nav-indicator absolute inset-0 bg-white/10 rounded-full transition-opacity opacity-0"></div>
+                    <i class="fa-solid fa-chart-pie text-[15px] z-10 transition-transform"></i>
+                    <span class="text-[9px] font-bold tracking-wide z-10">Insights</span>
+                </button>
+            </nav>
+        </div>
+
+        <!-- ==========================================
+             MODALS (Bottom Sheets)
+             ========================================== -->
+
+        <!-- Habit Bottom Sheet -->
+        <div id="habit-modal" role="dialog" aria-modal="true" aria-labelledby="habit-modal-title" class="fixed inset-0 z-50 flex flex-col justify-end hidden opacity-0 transition-opacity duration-300">
+            <div class="absolute inset-0 bg-black/60 backdrop-blur-sm" onclick="window.closeHabitModal()"></div>
+            <div id="habit-modal-content" tabindex="-1" class="glass-panel border-t border-white/10 rounded-t-[2.5rem] w-full max-h-[90vh] flex flex-col z-10 transform translate-y-full transition-transform duration-400 ease-out shadow-[0_-10px_40px_rgba(0,0,0,0.5)] outline-none">
+                
+                <div class="flex justify-center pt-3 pb-2">
+                    <div class="w-12 h-1.5 rounded-full bg-white/20"></div>
+                </div>
+
+                <div class="px-6 pb-2 flex justify-between items-center">
+                    <div>
+                        <h2 id="habit-modal-title" class="text-xl font-bold text-white tracking-tight">New Ritual</h2>
+                        <p class="text-xs text-zinc-400">Design your perfect habit</p>
+                    </div>
+                    <button onclick="window.closeHabitModal()" class="w-8 h-8 rounded-full bg-white/5 text-zinc-400 flex items-center justify-center hover:bg-white/10 transition-colors" aria-label="Close">
+                        <i class="fa-solid fa-xmark text-sm"></i>
+                    </button>
+                </div>
+                
+                <div class="flex-1 overflow-y-auto px-6 py-4 hide-scrollbar">
+                    <form id="form-habit" class="space-y-6">
+                        <input type="hidden" id="habit-id">
+                        
+                        <div>
+                            <input type="text" id="habit-name" placeholder="Name your habit (e.g. Read 20 Pages)" class="w-full bg-black/30 border border-white/10 rounded-2xl px-5 py-4 text-white text-sm placeholder-zinc-500 focus:outline-none focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/50 transition-all font-medium" required autocomplete="off">
+                        </div>
+                        
+                        <div>
+                            <label class="block text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-3">Iconography</label>
+                            <div class="grid grid-cols-6 gap-2" id="icon-picker"></div>
+                        </div>
+
+                        <div>
+                            <label class="block text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-3">Aura Color</label>
+                            <div class="flex gap-3 flex-wrap" id="color-picker"></div>
+                        </div>
+
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-2">Reminder</label>
+                                <div class="relative">
+                                    <input type="time" id="habit-time" class="w-full bg-black/30 border border-white/10 rounded-2xl px-4 py-3 text-white text-sm focus:outline-none focus:border-cyan-500/50">
+                                    <button type="button" onclick="document.getElementById('habit-time').value=''" class="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-white" aria-label="Clear time">
+                                        <i class="fa-solid fa-times-circle"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            <div>
+                                <label class="block text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-2">Frequency</label>
+                                <div class="bg-black/30 border border-white/10 rounded-2xl p-1 flex">
+                                    <button type="button" onclick="window.setScheduleType('everyday')" id="btn-everyday" class="flex-1 py-2 text-xs font-bold rounded-xl transition-all text-white bg-white/10 shadow-sm">Daily</button>
+                                    <button type="button" onclick="window.setScheduleType('specific')" id="btn-specific" class="flex-1 py-2 text-xs font-bold rounded-xl transition-all text-zinc-500">Custom</button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div id="specific-days-container" class="hidden grid grid-cols-7 gap-2"></div>
+                        
+                        <div class="pt-4 pb-8 flex gap-3">
+                            <button type="button" id="btn-delete-habit" onclick="window.confirmDeleteHabit()" class="hidden w-14 rounded-2xl bg-rose-500/10 text-rose-500 border border-rose-500/20 flex items-center justify-center hover:bg-rose-500/20 transition-all" aria-label="Delete ritual">
+                                <i class="fa-regular fa-trash-can"></i>
+                            </button>
+                            <button type="submit" id="btn-submit-habit" class="flex-1 bg-gradient-to-r from-cyan-500 to-purple-500 text-white font-bold text-sm rounded-2xl py-4 shadow-[0_0_15px_rgba(6,182,212,0.3)] hover:opacity-90 active:scale-[0.98] transition-all">
+                                Save Ritual
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- Daily Note Bottom Sheet -->
+        <div id="note-modal" role="dialog" aria-modal="true" aria-labelledby="note-habit-title" class="fixed inset-0 z-50 flex flex-col justify-end hidden opacity-0 transition-opacity duration-300">
+            <div class="absolute inset-0 bg-black/60 backdrop-blur-sm" onclick="window.closeNoteModal()"></div>
+            <div id="note-content" tabindex="-1" class="glass-panel border-t border-white/10 rounded-t-[2.5rem] w-full z-10 transform translate-y-full transition-transform duration-400 ease-out p-6 pb-10 outline-none">
+                <div class="flex justify-between items-start mb-6">
+                    <div class="flex items-center gap-3">
+                        <div id="note-habit-icon" class="w-12 h-12 rounded-2xl flex items-center justify-center text-xl shadow-inner"></div>
+                        <div>
+                            <h3 class="font-bold text-white text-lg" id="note-habit-title">Journal</h3>
+                            <p class="text-xs text-zinc-400" id="note-date-subtitle">Date</p>
+                        </div>
+                    </div>
+                    <button onclick="window.closeNoteModal()" class="w-8 h-8 rounded-full bg-white/5 text-zinc-400 flex items-center justify-center hover:bg-white/10" aria-label="Close">
+                        <i class="fa-solid fa-xmark text-sm"></i>
+                    </button>
+                </div>
+                <textarea id="habit-note-input" rows="4" placeholder="Log your thoughts, metrics, or mood..." class="w-full bg-black/30 border border-white/10 rounded-2xl p-4 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-purple-500/50 resize-none mb-4"></textarea>
+                <div class="flex gap-3">
+                    <button type="button" onclick="window.deleteNote()" class="w-14 rounded-2xl bg-white/5 text-zinc-400 hover:text-rose-400 hover:bg-rose-500/10 transition-colors flex items-center justify-center" aria-label="Delete note">
+                        <i class="fa-regular fa-trash-can"></i>
+                    </button>
+                    <button type="button" onclick="window.saveNote()" class="flex-1 bg-white/10 border border-white/10 text-white font-bold rounded-2xl py-3.5 hover:bg-white/20 transition-all active:scale-[0.98]">
+                        Save Entry
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Custom Confirm Modal -->
+        <div id="confirm-modal" role="dialog" aria-modal="true" aria-labelledby="confirm-title" class="fixed inset-0 z-[60] flex items-center justify-center px-6 hidden opacity-0 transition-opacity duration-200">
+            <div class="absolute inset-0 bg-black/60 backdrop-blur-sm" onclick="window.closeConfirmModal()"></div>
+            <div id="confirm-content" tabindex="-1" class="glass-panel border border-white/10 rounded-3xl w-full max-w-[320px] p-6 z-10 transform scale-95 transition-transform duration-300 text-center shadow-2xl outline-none">
+                <div class="w-14 h-14 rounded-full bg-rose-500/10 text-rose-500 flex items-center justify-center mx-auto mb-4 text-2xl border border-rose-500/20">
+                    <i class="fa-solid fa-triangle-exclamation"></i>
+                </div>
+                <h3 id="confirm-title" class="text-lg font-bold text-white mb-2">Are you sure?</h3>
+                <p id="confirm-message" class="text-xs text-zinc-400 mb-6">This action cannot be undone.</p>
+                <div class="flex gap-3">
+                    <button onclick="window.closeConfirmModal()" class="flex-1 py-3 rounded-xl bg-white/5 text-white font-medium text-xs hover:bg-white/10 transition-colors border border-white/5">Cancel</button>
+                    <button id="confirm-action-btn" class="flex-1 py-3 rounded-xl bg-rose-500 text-white font-bold text-xs hover:bg-rose-600 transition-colors shadow-[0_0_15px_rgba(244,63,94,0.4)]">Confirm</button>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Application Logic -->
+    <script>
+        // ==========================================
+        // CONSTANTS & STATE
+        // ==========================================
+        const STORAGE_KEY = 'auraHabits_v1_fixed';
+        
+        const ICONS = [
+            'fa-droplet', 'fa-dumbbell', 'fa-book-open', 'fa-brain',
+            'fa-moon', 'fa-sun', 'fa-code', 'fa-apple-whole',
+            'fa-pen-nib', 'fa-heart', 'fa-mug-hot', 'fa-person-running'
+        ];
+
+        const COLORS = [
+            '#06b6d4', '#3b82f6', '#8b5cf6', '#a855f7',
+            '#ec4899', '#f43f5e', '#f59e0b', '#10b981'
+        ];
+
+        const DAYS_MAP = [
+            { v: '1', l: 'M', full: 'Mon' }, { v: '2', l: 'T', full: 'Tue' },
+            { v: '3', l: 'W', full: 'Wed' }, { v: '4', l: 'T', full: 'Thu' },
+            { v: '5', l: 'F', full: 'Fri' }, { v: '6', l: 'S', full: 'Sat' },
+            { v: '0', l: 'S', full: 'Sun' }
+        ];
+
+        let state = {
+            habits: [],
+            currentTab: 'dashboard',
+            dashboardFilter: 'all',
+            calendarDate: getLocalTodayStr(),
+            calendarView: 'daily',
+            selectedHeatmapDate: getLocalTodayStr(),
+            scheduleType: 'everyday',
+            totalXP: 0,
+            level: 1
+        };
+
+        let charts = { donut: null };
+        let sortableInstance = null;
+        let activeNoteData = { hId: null, dateStr: null };
+        let notifiedCache = { date: null, ids: new Set() };
+        let confirmCallback = null;
+        let renderToken = 0;
+
+        // ==========================================
+        // UTILITIES
+        // ==========================================
+        function getLocalTodayStr() {
+            const d = new Date();
+            return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+        }
+        function addDaysStr(dateStr, days) {
+            const d = new Date(dateStr + "T00:00:00");
+            d.setDate(d.getDate() + days);
+            return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+        }
+        function formatDisplayDate(dateStr) {
+            try {
+                const d = new Date(dateStr + "T00:00:00");
+                return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+            } catch(e) { return dateStr; }
+        }
+        function formatTime(time24) {
+            if (!time24) return '';
+            const [h, m] = time24.split(':');
+            let hour = parseInt(h, 10);
+            const ampm = hour >= 12 ? 'PM' : 'AM';
+            hour = hour % 12 || 12;
+            return `${hour}:${m} ${ampm}`;
+        }
+        function escapeHTML(str) {
+            return str ? String(str).replace(/[&<>'"]/g, t => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[t])) : '';
+        }
+        function generateId() {
+            return 'h_' + Math.random().toString(36).substring(2, 9);
+        }
+
+        // ==========================================
+        // UI FEEDBACK (TOASTS / CONFIRM)
+        // ==========================================
+        function showToast(message, type = 'success') {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            
+            let icon = 'fa-check-circle', color = 'text-emerald-400', border = 'border-emerald-500/20';
+            if (type === 'warning') { icon = 'fa-exclamation-circle'; color = 'text-amber-400'; border = 'border-amber-500/20'; }
+            if (type === 'error') { icon = 'fa-times-circle'; color = 'text-rose-400'; border = 'border-rose-500/20'; }
+            if (type === 'info') { icon = 'fa-info-circle'; color = 'text-cyan-400'; border = 'border-cyan-500/20'; }
+
+            toast.className = `glass-panel ${border} flex items-center gap-3 px-4 py-3 rounded-2xl text-white text-xs font-medium shadow-2xl transform transition-all duration-300 translate-y-[-20px] opacity-0`;
+            toast.innerHTML = `<i class="fa-solid ${icon} ${color} text-sm" aria-hidden="true"></i><span>${escapeHTML(message)}</span>`;
+            
+            container.appendChild(toast);
+            requestAnimationFrame(() => toast.classList.remove('translate-y-[-20px]', 'opacity-0'));
+
+            setTimeout(() => {
+                toast.classList.add('opacity-0', 'translate-y-[-10px]');
+                setTimeout(() => toast.remove(), 300);
+            }, 2500);
+        }
+
+        window.openConfirmModal = ({ title, message, confirmText = 'Confirm', onConfirm }) => {
+            document.getElementById('confirm-title').innerText = title;
+            document.getElementById('confirm-message').innerText = message;
+            document.getElementById('confirm-action-btn').innerText = confirmText;
+            confirmCallback = onConfirm;
+
+            const modal = document.getElementById('confirm-modal');
+            const content = document.getElementById('confirm-content');
+            modal.classList.remove('hidden');
+            void modal.offsetWidth;
+            modal.classList.remove('opacity-0');
+            content.classList.remove('scale-95');
+            setTimeout(() => content.focus(), 100);
+        };
+
+        window.closeConfirmModal = () => {
+            const modal = document.getElementById('confirm-modal');
+            const content = document.getElementById('confirm-content');
+            modal.classList.add('opacity-0');
+            content.classList.add('scale-95');
+            setTimeout(() => { modal.classList.add('hidden'); confirmCallback = null; }, 250);
+        };
+
+        document.getElementById('confirm-action-btn').addEventListener('click', () => {
+            if (confirmCallback) confirmCallback();
+            window.closeConfirmModal();
+        });
+
+        function triggerConfetti() {
+            if (typeof confetti === 'function') {
+                confetti({
+                    particleCount: 80, spread: 70, origin: { y: 0.7 },
+                    colors: ['#06b6d4', '#a855f7', '#10b981', '#f59e0b'],
+                    disableForReducedMotion: true,
+                    zIndex: 1000
+                });
+            }
+        }
+
+        // ==========================================
+        // DATA & LOGIC
+        // ==========================================
+        function generateDemoData() {
+            const today = getLocalTodayStr();
+            const h = (id, name, icon, color, time, days, type) => ({
+                id: 'demo_'+id, name, icon, color, time, 
+                schedule: { type, days }, order: id,
+                createdAt: addDaysStr(today, -10), history: {}, notes: {}
+            });
+            
+            const demo = [
+                h(0, 'Hydrate (500ml)', 'fa-droplet', '#06b6d4', '08:00', [], 'everyday'),
+                h(1, 'Read 10 Pages', 'fa-book-open', '#a855f7', '', [], 'everyday'),
+                h(2, 'Gym Session', 'fa-dumbbell', '#f43f5e', '17:30', ['1','3','5'], 'specific')
+            ];
+
+            for (let i = -10; i <= 0; i++) {
+                const d = addDaysStr(today, i);
+                const isT = i === 0;
+                if (!isT) demo[0].history[d] = 'completed';
+                if (!isT) demo[1].history[d] = [-2, -5].includes(i) ? 'missed' : 'completed';
+                const dayStr = new Date(d+"T00:00:00").getDay().toString();
+                if (['1','3','5'].includes(dayStr) && !isT) {
+                    demo[2].history[d] = 'completed';
+                }
+            }
+            demo[1].notes[addDaysStr(today, -1)] = "Finished chapter 3!";
+            return demo;
+        }
+
+        function normalizeHabit(h) {
+            if (!h.history || typeof h.history !== 'object') h.history = {};
+            if (!h.notes || typeof h.notes !== 'object') h.notes = {};
+            if (!h.schedule || typeof h.schedule !== 'object') h.schedule = { type: 'everyday', days: [] };
+            if (!Array.isArray(h.schedule.days)) h.schedule.days = [];
+            if (typeof h.order !== 'number') h.order = 0;
+            return h;
+        }
+
+        function loadData() {
+            let loaded = null;
+            try {
+                const saved = localStorage.getItem(STORAGE_KEY);
+                if (saved) {
+                    const parsed = JSON.parse(saved);
+                    loaded = Array.isArray(parsed.habits) ? parsed.habits : [];
+                }
+            } catch (e) {
+                console.error("Local storage read error:", e);
+            }
+            // Only seed demo data on true first run — never resurrect after user clears list
+            state.habits = loaded === null ? generateDemoData() : loaded.map(normalizeHabit);
+            calcXP();
+        }
+
+        function saveData() {
+            try {
+                localStorage.setItem(STORAGE_KEY, JSON.stringify({ habits: state.habits }));
+            } catch(e) {
+                showToast("Failed to save data.", "error");
+            }
+            calcXP();
+        }
+
+        function isHabitScheduled(habit, dateStr) {
+            if (habit.createdAt > dateStr) return false;
+            if (habit.schedule?.type === 'specific') {
+                const d = new Date(dateStr + "T00:00:00").getDay().toString();
+                return (habit.schedule.days || []).includes(d);
+            }
+            return true;
+        }
+
+        function getStats(habit) {
+            const hist = habit.history || {};
+            const today = getLocalTodayStr();
+            let curr = habit.createdAt;
+            if (curr > today) curr = today;
+            let dates = [];
+            while (curr <= today) {
+                if (isHabitScheduled(habit, curr)) dates.push(curr);
+                curr = addDaysStr(curr, 1);
+            }
+
+            let best = 0, current = 0, comps = 0, temp = 0;
+            dates.forEach(d => {
+                if (hist[d] === 'completed') {
+                    comps++; temp++;
+                    if (temp > best) best = temp;
+                } else if (hist[d] === 'missed' || d < today) {
+                    temp = 0;
+                }
+            });
+
+            let idx = dates.length - 1;
+            if (idx >= 0 && dates[idx] === today && !hist[today]) idx--;
+            while (idx >= 0 && hist[dates[idx]] === 'completed') { current++; idx--; }
+
+            const rate = dates.length ? Math.round((comps / dates.length) * 100) : 0;
+            return { current, best, rate, comps, total: dates.length };
+        }
+
+        function calcXP() {
+            let xp = 0;
+            state.habits.forEach(h => {
+                xp += Object.values(h.history || {}).filter(v => v === 'completed').length * 15;
+                xp += Object.keys(h.notes || {}).length * 5;
+            });
+            state.totalXP = xp;
+            state.level = Math.floor(xp / 100) + 1;
+            
+            const levelEl = document.getElementById('header-level');
+            const greetingEl = document.getElementById('greeting');
+            if(levelEl) levelEl.innerText = `Lvl ${state.level}`;
+            if(greetingEl) greetingEl.innerText = `Level ${state.level} Achiever`;
+        }
+
+        // ==========================================
+        // NOTIFICATIONS
+        // ==========================================
+        window.toggleNotifications = () => {
+            if (!("Notification" in window)) { showToast("Unsupported on this device", "error"); return; }
+            if (Notification.permission === "granted") { showToast("Reminders already active", "info"); return; }
+            if (Notification.permission === "denied") {
+                showToast("Notifications blocked — enable in browser settings", "error");
+                return;
+            }
+            Notification.requestPermission().then(p => {
+                if (p === "granted") showToast("Reminders enabled", "success");
+                else showToast("Notifications not enabled", "warning");
+            });
+        };
+
+        function fireNotification(title, opts) {
+            try {
+                new Notification(title, opts);
+            } catch (e) {
+                // Android Chrome throws on constructor — fall back to Service Worker
+                if (navigator.serviceWorker && navigator.serviceWorker.ready) {
+                    navigator.serviceWorker.ready
+                        .then(r => r.showNotification(title, opts))
+                        .catch(() => {});
+                }
+            }
+        }
+
+        setInterval(() => {
+            if (!("Notification" in window) || Notification.permission !== "granted") return;
+            const now = new Date();
+            const hm = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
+            const today = getLocalTodayStr();
+            if (notifiedCache.date !== today) { notifiedCache.date = today; notifiedCache.ids.clear(); }
+            
+            state.habits.forEach(h => {
+                if (isHabitScheduled(h, today) && h.time === hm && h.history[today] !== 'completed' && !notifiedCache.ids.has(h.id)) {
+                    notifiedCache.ids.add(h.id);
+                    fireNotification(`Aura: ${h.name}`, { body: "Time to complete your ritual." });
+                }
+            });
+        }, 60000);
+
+        // ==========================================
+        // NAVIGATION & RENDER ENGINE
+        // ==========================================
+        window.switchTab = (tab) => {
+            state.currentTab = tab;
+            const token = ++renderToken;
+            
+            document.querySelectorAll('.nav-btn').forEach(btn => {
+                const isActive = btn.dataset.tab === tab;
+                btn.classList.toggle('text-white', isActive);
+                btn.classList.toggle('text-zinc-500', !isActive);
+                
+                const ind = btn.querySelector('.nav-indicator');
+                if (isActive) {
+                    ind.classList.remove('opacity-0');
+                    ind.classList.add('opacity-100');
+                } else {
+                    ind.classList.add('opacity-0');
+                    ind.classList.remove('opacity-100');
+                }
+                
+                const icon = btn.querySelector('i');
+                if(isActive) icon.classList.add('scale-110', 'text-cyan-400');
+                else icon.classList.remove('scale-110', 'text-cyan-400');
+            });
+
+            const main = document.getElementById('main-content');
+            main.classList.remove('view-enter');
+            main.classList.add('view-leave');
+            
+            setTimeout(() => {
+                // Tear down any prior instances before re-render
+                if (charts.donut) { try { charts.donut.destroy(); } catch(e){} charts.donut = null; }
+                if (sortableInstance) { try { sortableInstance.destroy(); } catch(e){} sortableInstance = null; }
+                
+                if (token !== renderToken) return; // superseded by a newer switchTab
+                
+                main.innerHTML = '';
+                
+                const fab = document.getElementById('fab-add');
+                if (tab === 'dashboard') { fab.classList.remove('translate-y-24', 'opacity-0'); renderDashboard(main); }
+                else { fab.classList.add('translate-y-24', 'opacity-0'); }
+                
+                if (tab === 'calendar') renderCalendar(main);
+                if (tab === 'insights') renderInsights(main);
+                
+                main.classList.remove('view-leave');
+                main.classList.add('view-enter');
+            }, 250); 
+        };
+
+        // ==========================================
+        // BUILDERS: HABIT CARD
+        // ==========================================
+        function buildCard(h, dateStr, drag) {
+            const hist = h.history || {};
+            const st = hist[dateStr];
+            const done = st === 'completed', miss = st === 'missed';
+            const note = h.notes?.[dateStr];
+            const stats = getStats(h);
+            const hex = h.color || '#06b6d4';
+            const safeHex = /^#[0-9a-f]{6}$/i.test(hex) ? hex : '#06b6d4';
+            
+            return `
+                <div class="swipe-container mb-3 shadow-[0_4px_20px_rgba(0,0,0,0.2)]" data-id="${h.id}">
+                    <div class="absolute inset-y-0 w-1/2 left-0 swipe-bg-left flex items-center pl-6 pointer-events-none">
+                        <i class="fa-solid fa-check text-white text-lg drop-shadow-md"></i>
+                    </div>
+                    <div class="absolute inset-y-0 w-1/2 right-0 swipe-bg-right flex items-center justify-end pr-6 pointer-events-none">
+                        <i class="fa-solid fa-xmark text-white text-lg drop-shadow-md"></i>
+                    </div>
+                    
+                    <div class="swipe-item glass-panel p-4 flex items-center gap-3 border-l-[3px]"
+                         style="border-left-color: ${safeHex};"
+                         data-hid="${h.id}" data-date="${dateStr}"
+                         ontouchstart="window.handleSwipeStart(event)" ontouchmove="window.handleSwipeMove(event)" ontouchend="window.handleSwipeEnd(event)"
+                         onmousedown="window.handleSwipeStart(event)">
+                        
+                        ${drag ? `<div class="drag-handle no-swipe px-1 text-zinc-600 hover:text-white cursor-grab active:cursor-grabbing"><i class="fa-solid fa-grip-vertical pointer-events-none"></i></div>` : ''}
+                        
+                        <button type="button" class="no-swipe w-12 h-12 rounded-2xl flex items-center justify-center text-xl shrink-0 transition-transform cursor-pointer active:scale-95 ${done ? 'opacity-50' : ''}"
+                                aria-label="Edit ${escapeHTML(h.name)}" title="Edit ritual"
+                                onclick="window.openHabitModal('${h.id}')"
+                                style="background: linear-gradient(135deg, ${safeHex}30, transparent); color: ${safeHex}; border: 1px solid ${safeHex}40;">
+                            <i class="fa-solid ${h.icon}" aria-hidden="true"></i>
+                        </button>
+                        
+                        <div class="flex-1 min-w-0 pointer-events-none">
+                            <div class="flex items-center gap-2 mb-1">
+                                <h3 class="font-bold text-sm truncate ${done ? 'line-through text-zinc-500' : miss ? 'text-zinc-500' : 'text-white'}">${escapeHTML(h.name)}</h3>
+                            </div>
+                            <div class="flex flex-wrap gap-2 text-[10px] font-bold uppercase tracking-wider">
+                                ${h.time ? `<span class="text-zinc-400"><i class="fa-regular fa-clock text-cyan-500 mr-0.5"></i>${formatTime(h.time)}</span>` : ''}
+                                <span class="text-zinc-400"><i class="fa-solid fa-fire text-amber-500 mr-0.5"></i>${stats.current}</span>
+                            </div>
+                            ${note ? `<div class="mt-2 text-[10px] text-purple-300 bg-purple-500/10 border border-purple-500/20 px-2 py-1 rounded-lg truncate pointer-events-auto cursor-pointer hover:bg-purple-500/20 no-swipe" onclick="window.openNoteModal('${h.id}','${dateStr}')"><i class="fa-solid fa-quote-left mr-1"></i>${escapeHTML(note)}</div>` : ''}
+                        </div>
+                        
+                        <div class="no-swipe flex gap-1.5 shrink-0">
+                            <button type="button" onclick="window.openNoteModal('${h.id}','${dateStr}')" class="w-8 h-8 rounded-full flex items-center justify-center bg-white/5 text-zinc-400 hover:text-white transition-colors" aria-label="Open note">
+                                <i class="fa-regular fa-note-sticky text-xs" aria-hidden="true"></i>
+                            </button>
+                            <button type="button" onclick="window.openHabitModal('${h.id}')" class="w-8 h-8 rounded-full flex items-center justify-center bg-white/5 text-zinc-400 hover:text-white transition-colors" aria-label="Edit ritual">
+                                <i class="fa-solid fa-pen text-xs" aria-hidden="true"></i>
+                            </button>
+                            <button type="button" onclick="window.quickToggle('${h.id}','${dateStr}')" class="w-10 h-10 rounded-full flex items-center justify-center text-sm transition-all ${
+                                done ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/50 shadow-[0_0_15px_rgba(16,185,129,0.2)]' : 
+                                miss ? 'bg-rose-500/10 text-rose-500 border border-rose-500/30' : 
+                                'bg-white/5 border border-white/10 text-zinc-400 hover:bg-white/10'
+                            }" aria-label="${done ? 'Mark pending' : miss ? 'Mark completed' : 'Mark completed'}">
+                                <i class="fa-solid ${done ? 'fa-check' : miss ? 'fa-xmark' : 'fa-check'}" aria-hidden="true"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        // ==========================================
+        // DASHBOARD
+        // ==========================================
+        function renderDashboard(container) {
+            const today = getLocalTodayStr();
+            let list = state.habits.filter(h => isHabitScheduled(h, today));
+            
+            list.sort((a,b) => {
+                if(a.time && b.time) return a.time.localeCompare(b.time);
+                if(a.time) return -1; if(b.time) return 1;
+                return (a.order||0) - (b.order||0);
+            });
+
+            const total = list.length;
+            const done = list.filter(h => h.history[today] === 'completed').length;
+            const pct = total ? Math.round((done/total)*100) : 0;
+            const dash = 251.2 - (pct/100)*251.2;
+
+            const filtered = list.filter(h => {
+                const st = h.history[today];
+                if (state.dashboardFilter === 'pending') return !st;
+                if (state.dashboardFilter === 'done') return st === 'completed';
+                return true;
+            });
+
+            // Drag reorder only when the full unfiltered list is visible — prevents order collisions.
+            const canDrag = state.dashboardFilter === 'all';
+
+            let html = `
+                <div class="glass-panel rounded-3xl p-5 mb-6 relative overflow-hidden group">
+                    <div class="absolute -right-10 -top-10 w-40 h-40 bg-cyan-500/20 rounded-full blur-3xl group-hover:bg-cyan-500/30 transition-colors"></div>
+                    <div class="flex items-center justify-between z-10 relative">
+                        <div>
+                            <div class="text-[10px] font-bold uppercase tracking-widest text-cyan-400 mb-1">Today's Progress</div>
+                            <h2 class="text-2xl font-black text-white">${pct === 100 && total>0 ? 'Perfect!' : 'Keep Going'}</h2>
+                            <p class="text-xs text-zinc-400 mt-1">${done} of ${total} rituals complete</p>
+                        </div>
+                        <div class="relative w-[90px] h-[90px]">
+                            <svg width="90" height="90" viewBox="0 0 90 90">
+                                <circle cx="45" cy="45" r="40" fill="none" class="stroke-white/5" stroke-width="6"></circle>
+                                <circle cx="45" cy="45" r="40" fill="none" stroke="url(#dashGrad)" stroke-width="6" stroke-linecap="round" class="progress-ring__circle drop-shadow-[0_0_8px_rgba(6,182,212,0.5)]" style="stroke-dasharray: 251.2; stroke-dashoffset: 251.2;"></circle>
+                                <defs>
+                                    <linearGradient id="dashGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                                        <stop offset="0%" stop-color="#06b6d4" />
+                                        <stop offset="100%" stop-color="#a855f7" />
+                                    </linearGradient>
+                                </defs>
+                            </svg>
+                            <div class="absolute inset-0 flex items-center justify-center font-black text-lg text-white">${pct}%</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="flex gap-2 mb-4">
+                    ${[
+                        { id: 'all', label: 'All Rituals' },
+                        { id: 'pending', label: 'Pending' },
+                        { id: 'done', label: 'Done' }
+                    ].map(f => {
+                        const act = state.dashboardFilter === f.id;
+                        return `<button onclick="window.dashboardFilter('${f.id}')" class="px-4 py-2 rounded-full text-xs font-bold transition-all border ${act ? 'bg-white text-black border-white shadow-[0_0_15px_rgba(255,255,255,0.2)]' : 'bg-transparent text-zinc-400 border-white/10 hover:border-white/30'}">${f.label}</button>`;
+                    }).join('')}
+                </div>
+
+                <div id="dash-list" class="min-h-[100px] pb-10">
+                    ${filtered.length === 0 ? `
+                        <div class="py-12 text-center">
+                            <div class="w-16 h-16 rounded-full bg-white/5 flex items-center justify-center mx-auto mb-4 text-2xl text-zinc-600"><i class="fa-solid fa-leaf"></i></div>
+                            <h3 class="text-sm font-bold text-white">Nothing here</h3>
+                            <p class="text-xs text-zinc-500 mt-1">Take a deep breath or create a new ritual.</p>
+                        </div>
+                    ` : filtered.map(h => buildCard(h, today, canDrag)).join('')}
+                </div>
+            `;
+            container.innerHTML = html;
+
+            // Animate progress ring after paint
+            const ring = container.querySelector('.progress-ring__circle');
+            if (ring) {
+                requestAnimationFrame(() => {
+                    if (ring.isConnected) ring.style.strokeDashoffset = String(dash);
+                });
+            }
+
+            const listEl = document.getElementById('dash-list');
+            if (listEl && canDrag && filtered.length > 1 && typeof Sortable !== 'undefined') {
+                sortableInstance = Sortable.create(listEl, {
+                    handle: '.drag-handle', animation: 250, ghostClass: 'sortable-ghost', dragClass: 'sortable-drag',
+                    onEnd: () => {
+                        // Visible list === full list here, so order is complete
+                        Array.from(listEl.children).forEach((el, i) => {
+                            const h = state.habits.find(x => x.id === el.dataset.id);
+                            if(h) h.order = i;
+                        });
+                        saveData();
+                    }
+                });
+            }
+        }
+
+        window.dashboardFilter = (f) => { state.dashboardFilter = f; renderDashboard(document.getElementById('main-content')); };
+
+        // ==========================================
+        // CALENDAR
+        // ==========================================
+        function renderCalendar(container) {
+            let html = `
+                <div class="glass-panel rounded-full p-1 flex mb-6">
+                    ${[{id:'daily',l:'Daily'},{id:'weekly',l:'Weekly'},{id:'monthly',l:'Heatmap'}].map(v => {
+                        const act = state.calendarView === v.id;
+                        return `<button onclick="window.setCalView('${v.id}')" class="flex-1 py-2 rounded-full text-xs font-bold transition-all ${act?'bg-white/10 text-white shadow-sm':'text-zinc-500 hover:text-zinc-300'}">${v.l}</button>`;
+                    }).join('')}
+                </div>
+                <div id="cal-sub" class="view-enter pb-10"></div>
+            `;
+            container.innerHTML = html;
+            const sub = document.getElementById('cal-sub');
+            if (state.calendarView === 'daily') renderCalDaily(sub);
+            if (state.calendarView === 'weekly') renderCalWeekly(sub);
+            if (state.calendarView === 'monthly') renderCalMonthly(sub);
+        }
+        
+        window.setCalView = (v) => { state.calendarView = v; window.switchTab('calendar'); };
+
+        function renderCalDaily(sub) {
+            const sel = state.calendarDate, today = getLocalTodayStr();
+            let dates = [];
+            for (let i=-3; i<=3; i++) dates.push(addDaysStr(sel, i));
+            
+            let html = `
+                <div class="flex justify-between items-end mb-4">
+                    <div>
+                        <h2 class="text-xl font-black text-white">${sel === today ? 'Today' : formatDisplayDate(sel)}</h2>
+                    </div>
+                    ${sel !== today ? `<button onclick="window.jumpDate('${today}')" class="text-xs font-bold text-cyan-400 bg-cyan-400/10 px-3 py-1.5 rounded-lg">Jump to Today</button>` : ''}
+                </div>
+                <div class="flex justify-between gap-2 mb-6">
+                    ${dates.map(d => {
+                        const dObj = new Date(d+"T00:00:00");
+                        const isS = d === sel, isF = d > today;
+                        const day = dObj.toLocaleDateString('en-US',{weekday:'short'}).charAt(0);
+                        const num = dObj.getDate();
+                        return `<button ${isF?'disabled':`onclick="window.jumpDate('${d}')"`} class="flex-1 py-3 rounded-2xl flex flex-col items-center border ${isS?'bg-cyan-500 border-cyan-400 shadow-[0_0_15px_rgba(6,182,212,0.4)] text-black':isF?'border-transparent opacity-30':'glass-button border-white/5 text-zinc-400'} transition-all">
+                            <span class="text-[9px] font-bold mb-1">${day}</span>
+                            <span class="text-sm font-black">${num}</span>
+                        </button>`;
+                    }).join('')}
+                </div>
+                <div class="space-y-3">
+            `;
+            const sched = state.habits.filter(h => isHabitScheduled(h, sel)).sort((a,b)=>(a.order||0)-(b.order||0));
+            if(sched.length===0) html += `<div class="text-center py-10 text-zinc-600 text-xs">Nothing scheduled for this day.</div>`;
+            else html += sched.map(h => buildCard(h, sel, false)).join('');
+            html += `</div>`;
+            sub.innerHTML = html;
+        }
+
+        window.jumpDate = (d) => { state.calendarDate = d; state.calendarView = 'daily'; window.switchTab('calendar'); };
+
+        function renderCalWeekly(sub) {
+            const baseD = new Date(state.calendarDate+"T00:00:00");
+            const offset = baseD.getDay()===0 ? -6 : 1-baseD.getDay();
+            baseD.setDate(baseD.getDate()+offset);
+            const wDates = Array.from({length:7}, (_,i)=>{
+                const d = new Date(baseD); d.setDate(baseD.getDate()+i);
+                return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+            });
+            const today = getLocalTodayStr();
+
+            let html = `
+                <div class="flex justify-between items-center mb-4">
+                    <button onclick="window.shiftWeek(-7)" class="w-8 h-8 glass-button rounded-full" aria-label="Previous week"><i class="fa-solid fa-chevron-left text-xs"></i></button>
+                    <div class="text-sm font-bold text-white">${formatDisplayDate(wDates[0])} - ${formatDisplayDate(wDates[6])}</div>
+                    <button onclick="window.shiftWeek(7)" class="w-8 h-8 glass-button rounded-full" aria-label="Next week"><i class="fa-solid fa-chevron-right text-xs"></i></button>
+                </div>
+                <div class="glass-panel rounded-3xl overflow-hidden border border-white/5">
+                    <div class="grid grid-cols-[auto_repeat(7,1fr)] bg-white/5 border-b border-white/5">
+                        <div class="p-2"></div>
+                        ${wDates.map(d=>`<div class="p-2 text-center text-[10px] font-bold ${d===today?'text-cyan-400':'text-zinc-500'}">${new Date(d+"T00:00:00").toLocaleDateString('en-US',{weekday:'short'}).charAt(0)}<br>${parseInt(d.slice(8))}</div>`).join('')}
+                    </div>
+            `;
+            state.habits.forEach(h => {
+                html += `<div class="grid grid-cols-[auto_repeat(7,1fr)] border-b border-white/5 last:border-0 p-2 items-center gap-1">
+                    <div class="w-8 h-8 rounded-xl flex items-center justify-center text-[10px] truncate" style="background:${h.color}20;color:${h.color}"><i class="fa-solid ${h.icon}"></i></div>
+                    ${wDates.map(d=>{
+                        if(!isHabitScheduled(h,d)) return `<div class="flex justify-center"><div class="w-1.5 h-1.5 rounded-full bg-white/10"></div></div>`;
+                        const st = (h.history||{})[d], isF = d > today;
+                        let ui = `<div class="w-6 h-6 rounded-lg border border-white/10 mx-auto"></div>`;
+                        if(st==='completed') ui = `<div class="w-6 h-6 rounded-lg bg-emerald-500 text-white flex justify-center items-center text-[10px] shadow-[0_0_10px_rgba(16,185,129,0.3)]"><i class="fa-solid fa-check"></i></div>`;
+                        if(st==='missed') ui = `<div class="w-6 h-6 rounded-lg bg-rose-500/20 text-rose-500 flex justify-center items-center text-[10px] border border-rose-500/30"><i class="fa-solid fa-xmark"></i></div>`;
+                        // Past + today are interactive; future disabled
+                        return `<div class="${isF?'opacity-20 pointer-events-none':'cursor-pointer'}" ${isF?'':`onclick="window.cycle('${h.id}','${d}')"`} role="button" aria-label="${escapeHTML(h.name)} on ${d}">${ui}</div>`;
+                    }).join('')}
+                </div>`;
+            });
+            html += `</div>`;
+            sub.innerHTML = html;
+        }
+
+        window.shiftWeek = (d) => { state.calendarDate = addDaysStr(state.calendarDate, d); renderCalendar(document.getElementById('main-content')); };
+
+        function renderCalMonthly(sub) {
+            const baseD = new Date(state.calendarDate+"T00:00:00");
+            const y = baseD.getFullYear(), m = baseD.getMonth();
+            const first = new Date(y, m, 1).getDay();
+            const days = new Date(y, m+1, 0).getDate();
+            const today = getLocalTodayStr();
+
+            let html = `
+                <div class="flex justify-between items-center mb-6">
+                    <button onclick="window.shiftMonth(-1)" class="w-8 h-8 glass-button rounded-full" aria-label="Previous month"><i class="fa-solid fa-chevron-left text-xs"></i></button>
+                    <div class="text-sm font-bold text-white">${baseD.toLocaleDateString('en-US',{month:'long',year:'numeric'})}</div>
+                    <button onclick="window.shiftMonth(1)" class="w-8 h-8 glass-button rounded-full" aria-label="Next month"><i class="fa-solid fa-chevron-right text-xs"></i></button>
+                </div>
+                <div class="glass-panel rounded-3xl p-5 mb-6">
+                    <div class="grid grid-cols-7 gap-2 mb-2 text-center text-[10px] font-bold text-zinc-500">
+                        <div>S</div><div>M</div><div>T</div><div>W</div><div>T</div><div>F</div><div>S</div>
+                    </div>
+                    <div class="grid grid-cols-7 gap-2">
+            `;
+            for(let i=0;i<first;i++) html += `<div></div>`;
+            for(let d=1;d<=days;d++) {
+                const dStr = `${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+                const isF = dStr > today;
+                let sc=0, cc=0;
+                if(!isF){
+                    state.habits.forEach(h=>{
+                        if(isHabitScheduled(h,dStr)){ sc++; if((h.history||{})[dStr]==='completed') cc++; }
+                    });
+                }
+                let cls = "bg-white/5 text-zinc-500 border border-white/5";
+                if(sc>0 && !isF){
+                    const p=cc/sc;
+                    if(p===0) cls="bg-white/5 text-zinc-400";
+                    else if(p<0.5) cls="bg-cyan-500/20 text-cyan-400";
+                    else if(p<1) cls="bg-cyan-500/60 text-white";
+                    else cls="bg-cyan-400 text-black shadow-[0_0_10px_rgba(6,182,212,0.5)]";
+                }
+                if(dStr===state.selectedHeatmapDate) cls+=" ring-2 ring-white";
+                html += `<button ${isF?'disabled':`onclick="window.selHeat('${dStr}')"`} class="aspect-square rounded-xl flex items-center justify-center text-xs font-bold ${cls} transition-all ${isF?'opacity-20':''}">${d}</button>`;
+            }
+            html += `</div></div>`;
+            
+            const inspH = state.habits.filter(h=>isHabitScheduled(h, state.selectedHeatmapDate));
+            html += `
+                <div class="glass-panel rounded-3xl p-5">
+                    <div class="flex justify-between items-center mb-4">
+                        <div class="text-xs font-bold text-cyan-400 tracking-widest uppercase">Inspector</div>
+                        <div class="text-sm font-bold text-white">${formatDisplayDate(state.selectedHeatmapDate)}</div>
+                    </div>
+                    <div class="space-y-2">
+                        ${inspH.length===0?`<p class="text-xs text-zinc-500 py-2">No habits scheduled.</p>`:inspH.map(h=>{
+                            const st = (h.history||{})[state.selectedHeatmapDate];
+                            return `<div class="flex justify-between items-center bg-white/5 border border-white/5 rounded-xl p-3">
+                                <div class="flex items-center gap-3">
+                                    <div class="w-8 h-8 rounded-lg flex items-center justify-center text-xs" style="background:${h.color}20;color:${h.color}"><i class="fa-solid ${h.icon}"></i></div>
+                                    <span class="text-xs font-bold text-white">${escapeHTML(h.name)}</span>
+                                </div>
+                                <div class="text-[10px] font-bold uppercase ${st==='completed'?'text-emerald-400':st==='missed'?'text-rose-400':'text-zinc-500'}">${st||'Pending'}</div>
+                            </div>`;
+                        }).join('')}
+                    </div>
+                </div>
+            `;
+            sub.innerHTML = html;
+        }
+
+        window.shiftMonth = (dir) => {
+            const d = new Date(state.calendarDate+"T00:00:00");
+            d.setMonth(d.getMonth()+dir); d.setDate(1);
+            const str = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-01`;
+            if(str > getLocalTodayStr()) return;
+            state.calendarDate = str; state.selectedHeatmapDate = str;
+            renderCalendar(document.getElementById('main-content'));
+        };
+        window.selHeat = (d) => { state.selectedHeatmapDate = d; renderCalendar(document.getElementById('main-content')); };
+
+        // cycle / quickToggle / swipe all allow backfill for past dates, but never future.
+        window.cycle = (hId, dStr) => {
+            if(dStr > getLocalTodayStr()) { showToast("Cannot log future dates.", "warning"); return; }
+            const h = state.habits.find(x=>x.id===hId); if(!h) return;
+            if (!h.history) h.history = {};
+            const cur = h.history[dStr];
+            if(!cur) { h.history[dStr] = 'completed'; if(dStr===getLocalTodayStr()) triggerConfetti(); }
+            else if(cur==='completed') h.history[dStr] = 'missed';
+            else delete h.history[dStr];
+            saveData(); window.switchTab(state.currentTab);
+        };
+        window.quickToggle = (hId, dStr) => {
+            if(dStr > getLocalTodayStr()) { showToast("Cannot log future dates.", "warning"); return; }
+            const h = state.habits.find(x=>x.id===hId); if(!h) return;
+            if (!h.history) h.history = {};
+            const cur = h.history[dStr];
+            if(!cur || cur==='missed') { h.history[dStr]='completed'; if(dStr===getLocalTodayStr()) triggerConfetti(); }
+            else { delete h.history[dStr]; }
+            saveData(); window.switchTab(state.currentTab);
+        };
+
+        // ==========================================
+        // INSIGHTS
+        // ==========================================
+        function getBadges() {
+            let tc = 0, tn = 0, bestS = 0;
+            state.habits.forEach(h => {
+                tc += Object.values(h.history||{}).filter(v=>v==='completed').length;
+                tn += Object.keys(h.notes||{}).length;
+                const bs = getStats(h).best; if(bs>bestS) bestS = bs;
+            });
+            return [
+                { id:'b1', n:'First Step', d:'Complete 1 ritual', i:'fa-seedling', p:Math.min(1,tc), t:1, c:'text-emerald-400 bg-emerald-400/20 border-emerald-400/30' },
+                { id:'b2', n:'7-Day Streak', d:'Reach a 7d streak', i:'fa-fire', p:Math.min(7,bestS), t:7, c:'text-amber-400 bg-amber-400/20 border-amber-400/30' },
+                { id:'b3', n:'Reflector', d:'Write 5 notes', i:'fa-feather', p:Math.min(5,tn), t:5, c:'text-purple-400 bg-purple-400/20 border-purple-400/30' },
+                { id:'b4', n:'Aura Master', d:'Reach Level 5', i:'fa-crown', p:Math.min(5,state.level), t:5, c:'text-cyan-400 bg-cyan-400/20 border-cyan-400/30' }
+            ];
+        }
+
+        function renderInsights(container) {
+            let tc=0, tm=0, ts=0;
+            const today = getLocalTodayStr();
+            state.habits.forEach(h=>{
+                let c=h.createdAt; if(c>today) c=today;
+                while(c<=today){
+                    if(isHabitScheduled(h,c)){
+                        ts++;
+                        const st = (h.history||{})[c];
+                        if(st==='completed') tc++;
+                        else if(st==='missed' || c<today) tm++;
+                    }
+                    c = addDaysStr(c,1);
+                }
+            });
+            const pen = Math.max(0, ts-tc-tm);
+            const rate = ts ? Math.round((tc/ts)*100) : 0;
+            const badges = getBadges();
+            const xpInLevel = state.totalXP % 100;
+            const xpToNext = 100 - xpInLevel;
+
+            let html = `
+                <div class="glass-panel rounded-3xl p-5 mb-6">
+                    <div class="flex justify-between items-center mb-3">
+                        <div>
+                            <div class="text-[10px] font-bold uppercase tracking-widest text-cyan-400">Your Level</div>
+                            <div class="text-xl font-black text-white">Level ${state.level}</div>
+                        </div>
+                        <div class="text-right">
+                            <div class="text-[10px] font-bold uppercase tracking-widest text-zinc-500">Total XP</div>
+                            <div class="text-xl font-black text-amber-400">${state.totalXP}</div>
+                        </div>
+                    </div>
+                    <div class="h-2 bg-white/10 rounded-full overflow-hidden">
+                        <div class="h-full bg-gradient-to-r from-cyan-400 to-purple-500 rounded-full transition-all" style="width:${xpInLevel}%"></div>
+                    </div>
+                    <div class="text-[10px] text-zinc-500 text-center mt-2">${xpToNext} XP to Level ${state.level + 1}</div>
+                </div>
+
+                <div class="glass-panel rounded-3xl p-5 mb-6">
+                    <h2 class="text-sm font-bold text-white mb-6 uppercase tracking-widest text-center">Consistency Matrix</h2>
+                    <div class="relative h-48 w-full flex justify-center mb-6">
+                        <canvas id="donutChart"></canvas>
+                        <div class="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                            <span class="text-3xl font-black text-white drop-shadow-md">${rate}%</span>
+                            <span class="text-[10px] font-bold text-cyan-400 tracking-widest">GLOBAL</span>
+                        </div>
+                    </div>
+                    <div class="flex justify-around text-center">
+                        <div>
+                            <div class="text-xl font-black text-emerald-400">${tc}</div>
+                            <div class="text-[9px] font-bold uppercase text-zinc-500">Done</div>
+                        </div>
+                        <div>
+                            <div class="text-xl font-black text-rose-400">${tm}</div>
+                            <div class="text-[9px] font-bold uppercase text-zinc-500">Missed</div>
+                        </div>
+                        <div>
+                            <div class="text-xl font-black text-zinc-400">${pen}</div>
+                            <div class="text-[9px] font-bold uppercase text-zinc-500">Pending</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mb-6 pb-10">
+                    <h3 class="text-xs font-bold text-zinc-400 uppercase tracking-widest mb-3 px-2">Aura Badges</h3>
+                    <div class="grid grid-cols-2 gap-3">
+                        ${badges.map(b=>{
+                            const unl = b.p >= b.t;
+                            const pct = (b.p/b.t)*100;
+                            return `<div class="glass-panel p-4 rounded-3xl border transition-all ${unl ? 'border-cyan-500/40 shadow-[0_0_15px_rgba(6,182,212,0.15)] bg-cyan-500/5' : 'border-white/5 opacity-60'}">
+                                <div class="w-10 h-10 rounded-2xl flex items-center justify-center text-lg mb-3 border ${unl ? b.c : 'bg-white/5 text-zinc-600 border-white/5'}">
+                                    <i class="fa-solid ${b.i}"></i>
+                                </div>
+                                <h4 class="text-xs font-bold text-white">${b.n}</h4>
+                                <p class="text-[9px] text-zinc-400 mt-1 mb-3">${b.d}</p>
+                                <div class="h-1 bg-white/10 rounded-full overflow-hidden">
+                                    <div class="h-full bg-cyan-400 rounded-full" style="width:${pct}%"></div>
+                                </div>
+                            </div>`;
+                        }).join('')}
+                    </div>
+                </div>
+            `;
+            container.innerHTML = html;
+
+            // Chart guard + paint guard
+            if (typeof Chart === 'undefined') {
+                const cv = document.getElementById('donutChart');
+                if (cv) cv.parentElement.innerHTML = '<div class="flex items-center justify-center h-full text-xs text-zinc-500">Chart unavailable</div>';
+                return;
+            }
+
+            requestAnimationFrame(() => {
+                const canvas = document.getElementById('donutChart');
+                if (!canvas || !canvas.isConnected) return; // superseded
+                const ctx = canvas.getContext('2d');
+                charts.donut = new Chart(ctx, {
+                    type: 'doughnut',
+                    data: {
+                        labels: ['Done', 'Missed', 'Pending'],
+                        datasets: [{
+                            data: ts ? [tc, tm, pen] : [1],
+                            backgroundColor: ts ? ['#10b981', '#f43f5e', '#3f3f46'] : ['#27272a'],
+                            borderWidth: 0, hoverOffset: 4
+                        }]
+                    },
+                    options: {
+                        responsive: true, maintainAspectRatio: false, cutout: '80%',
+                        plugins: { legend: { display: false }, tooltip: { enabled: ts>0 } }
+                    }
+                });
+            });
+        }
+
+        // ==========================================
+        // SWIPE GESTURES
+        // ==========================================
+        let gx=0, gy=0, cx=0, swEl=null, swiping=false;
+        window.handleSwipeStart = (e) => {
+            if(e.target.closest('.no-swipe')) return;
+            if(e.type==='mousedown' && e.button!==0) return;
+            swEl = e.currentTarget;
+            const p = e.touches ? e.touches[0] : e;
+            gx = p.clientX; cx = gx; gy = p.clientY;
+            swiping = false;
+            swEl.classList.add('dragging');
+            if(e.type==='mousedown'){ 
+                window.addEventListener('mousemove', handleSwipeMove); 
+                window.addEventListener('mouseup', handleSwipeEnd); 
+            }
+        };
+        window.handleSwipeMove = (e) => {
+            if(!swEl) return;
+            const p = e.touches ? e.touches[0] : e;
+            cx = p.clientX;
+            const dx = cx - gx, dy = p.clientY - gy;
+            
+            if(!swiping && Math.abs(dy) > Math.abs(dx) && Math.abs(dy) > 10){ 
+                swEl.classList.remove('dragging'); 
+                swEl = null; 
+                return; 
+            }
+            
+            if(Math.abs(dx) > 10) swiping = true;
+            
+            if(swiping){
+                if(e.cancelable) e.preventDefault();
+                swEl.style.transform = `translateX(${Math.max(-100, Math.min(100, dx))}px)`;
+            }
+        };
+        window.handleSwipeEnd = () => {
+            window.removeEventListener('mousemove', handleSwipeMove); 
+            window.removeEventListener('mouseup', handleSwipeEnd);
+            if(!swEl) return;
+            
+            const dx = cx - gx, el = swEl, hid = el.dataset.hid, date = el.dataset.date;
+            el.classList.remove('dragging'); 
+            swEl = null;
+            
+            if(swiping && Math.abs(dx) > 60){
+                if(date > getLocalTodayStr()) {
+                    el.style.transform = 'translateX(0)';
+                    showToast("Cannot log future dates.", "warning");
+                } else {
+                    el.style.transform = `translateX(${dx>0?120:-120}px)`;
+                    setTimeout(() => {
+                        const h = state.habits.find(x=>x.id===hid);
+                        if(h){
+                            if (!h.history) h.history = {};
+                            const nSt = dx>0 ? 'completed':'missed';
+                            if(h.history[date]===nSt) delete h.history[date];
+                            else { h.history[date]=nSt; if(nSt==='completed' && date===getLocalTodayStr()) triggerConfetti(); }
+                            saveData(); window.switchTab(state.currentTab);
+                        }
+                    }, 200);
+                }
+            } else {
+                el.style.transform = 'translateX(0)';
+            }
+            swiping = false;
+        };
+
+        // ==========================================
+        // MODALS (Habit & Note)
+        // ==========================================
+        window.openHabitModal = (id = null) => {
+            const form = document.getElementById('form-habit'); form.reset();
+            document.getElementById('habit-id').value = id||'';
+            document.getElementById('habit-modal-title').innerText = id ? 'Edit Ritual' : 'New Ritual';
+            document.getElementById('btn-delete-habit').classList.toggle('hidden', !id);
+            
+            if(id){
+                const h = state.habits.find(x=>x.id===id);
+                if (!h) return;
+                document.getElementById('habit-name').value = h.name;
+                document.getElementById('habit-time').value = h.time||'';
+                const iconInput = document.querySelector(`input[name="h-icon"][value="${h.icon}"]`);
+                if (iconInput) iconInput.checked = true;
+                const colorInput = document.querySelector(`input[name="h-color"][value="${h.color}"]`);
+                if (colorInput) colorInput.checked = true;
+                window.setScheduleType(h.schedule?.type||'everyday');
+                if(h.schedule?.type==='specific'){
+                    document.querySelectorAll('.day-cb').forEach(cb=>cb.checked=(h.schedule.days||[]).includes(cb.value));
+                }
+            } else {
+                window.setScheduleType('everyday');
+                document.querySelectorAll('.day-cb').forEach(cb=>cb.checked=(cb.value!=='0'&&cb.value!=='6'));
+            }
+
+            const m = document.getElementById('habit-modal'), c = document.getElementById('habit-modal-content');
+            m.classList.remove('hidden'); void m.offsetWidth;
+            m.classList.remove('opacity-0'); c.classList.remove('translate-y-full');
+            setTimeout(() => c.focus(), 100);
+        };
+        window.closeHabitModal = () => {
+            const m = document.getElementById('habit-modal'), c = document.getElementById('habit-modal-content');
+            m.classList.add('opacity-0'); c.classList.add('translate-y-full');
+            setTimeout(()=>m.classList.add('hidden'), 400);
+        };
+        window.setScheduleType = (t) => {
+            state.scheduleType = t;
+            const e = document.getElementById('btn-everyday'), s = document.getElementById('btn-specific'), c = document.getElementById('specific-days-container');
+            if(t==='everyday'){
+                e.className="flex-1 py-2 text-xs font-bold rounded-xl transition-all text-white bg-white/10 shadow-sm";
+                s.className="flex-1 py-2 text-xs font-bold rounded-xl transition-all text-zinc-500 bg-transparent";
+                c.classList.add('hidden');
+            } else {
+                s.className="flex-1 py-2 text-xs font-bold rounded-xl transition-all text-white bg-white/10 shadow-sm";
+                e.className="flex-1 py-2 text-xs font-bold rounded-xl transition-all text-zinc-500 bg-transparent";
+                c.classList.remove('hidden');
+            }
+        };
+        document.getElementById('form-habit').addEventListener('submit', (e) => {
+            e.preventDefault();
+            const id = document.getElementById('habit-id').value, name = document.getElementById('habit-name').value.trim();
+            if(!name) return;
+            const icon = document.querySelector('input[name="h-icon"]:checked')?.value || ICONS[0];
+            const color = document.querySelector('input[name="h-color"]:checked')?.value || COLORS[0];
+            const time = document.getElementById('habit-time').value || null;
+            let sched = { type: state.scheduleType, days: [] };
+            if(state.scheduleType==='specific'){
+                sched.days = Array.from(document.querySelectorAll('.day-cb:checked')).map(c=>c.value);
+                if(!sched.days.length){ showToast('Select at least one day','warning'); return; }
+            }
+            if(id){
+                const h = state.habits.find(x=>x.id===id);
+                if(h) Object.assign(h, {name, icon, color, time, schedule:sched});
+            } else {
+                state.habits.push(normalizeHabit({ id:generateId(), name, icon, color, time, schedule:sched, order:state.habits.length, createdAt:getLocalTodayStr(), history:{}, notes:{} }));
+            }
+            saveData(); window.closeHabitModal(); window.switchTab(state.currentTab);
+        });
+        window.confirmDeleteHabit = () => {
+            const id = document.getElementById('habit-id').value;
+            window.openConfirmModal({ title:'Delete Ritual', message:'All history will be lost forever.', onConfirm:()=>{
+                state.habits = state.habits.filter(x=>x.id!==id);
+                saveData(); window.closeHabitModal(); window.switchTab(state.currentTab);
+            }});
+        };
+
+        window.openNoteModal = (hId, dStr) => {
+            if(dStr > getLocalTodayStr()) { showToast("Cannot open future notes.", "warning"); return; }
+            const h = state.habits.find(x=>x.id===hId); if(!h) return;
+            activeNoteData = { hId, dStr };
+            document.getElementById('note-habit-title').innerText = h.name;
+            document.getElementById('note-date-subtitle').innerText = formatDisplayDate(dStr);
+            const iconEl = document.getElementById('note-habit-icon');
+            const safeColor = /^#[0-9a-f]{6}$/i.test(h.color||'') ? h.color : '#06b6d4';
+            iconEl.style.background = `${safeColor}20`; iconEl.style.color = safeColor; iconEl.style.borderColor = `${safeColor}40`;
+            iconEl.innerHTML = `<i class="fa-solid ${h.icon}"></i>`;
+            document.getElementById('habit-note-input').value = h.notes?.[dStr] || '';
+            const m = document.getElementById('note-modal'), c = document.getElementById('note-content');
+            m.classList.remove('hidden'); void m.offsetWidth;
+            m.classList.remove('opacity-0'); c.classList.remove('translate-y-full');
+            setTimeout(() => c.focus(), 100);
+        };
+        window.closeNoteModal = () => {
+            const m = document.getElementById('note-modal'), c = document.getElementById('note-content');
+            m.classList.add('opacity-0'); c.classList.add('translate-y-full');
+            setTimeout(()=>m.classList.add('hidden'), 400);
+        };
+        window.saveNote = () => {
+            const t = document.getElementById('habit-note-input').value.trim();
+            const h = state.habits.find(x=>x.id===activeNoteData.hId);
+            if(h){
+                if(!h.notes) h.notes={};
+                if(t) h.notes[activeNoteData.dStr] = t; else delete h.notes[activeNoteData.dStr];
+                saveData(); window.closeNoteModal(); window.switchTab(state.currentTab);
+            }
+        };
+        window.deleteNote = () => { document.getElementById('habit-note-input').value=''; window.saveNote(); };
+
+        // ==========================================
+        // INIT & EVENT LISTENERS
+        // ==========================================
+        function initApp() {
+            document.getElementById('icon-picker').innerHTML = ICONS.map((i, idx) => `
+                <label class="cursor-pointer group">
+                    <input type="radio" name="h-icon" value="${i}" class="peer sr-only" ${idx===0?'checked':''}>
+                    <div class="w-10 h-10 rounded-xl bg-white/5 border border-white/5 peer-checked:bg-cyan-500 peer-checked:text-black peer-checked:border-cyan-400 text-zinc-500 flex items-center justify-center transition-all group-hover:bg-white/10 shadow-sm"><i class="fa-solid ${i}"></i></div>
+                </label>
+            `).join('');
+
+            document.getElementById('color-picker').innerHTML = COLORS.map((c, idx) => `
+                <label class="cursor-pointer">
+                    <input type="radio" name="h-color" value="${c}" class="peer sr-only" ${idx===0?'checked':''}>
+                    <div class="w-8 h-8 rounded-full border-2 border-transparent peer-checked:border-white transition-all shadow-sm" style="background:${c}"></div>
+                </label>
+            `).join('');
+
+            document.getElementById('specific-days-container').innerHTML = DAYS_MAP.map(d => `
+                <label class="cursor-pointer">
+                    <input type="checkbox" value="${d.v}" class="day-cb peer sr-only">
+                    <div class="w-full aspect-square rounded-xl bg-white/5 border border-white/5 flex items-center justify-center text-xs font-bold text-zinc-500 peer-checked:bg-cyan-500 peer-checked:text-black peer-checked:border-cyan-400 transition-all">${d.l}</div>
+                </label>
+            `).join('');
+
+            loadData();
+            window.switchTab('dashboard');
+            
+            // Escape closes topmost modal
+            document.addEventListener('keydown', (e) => {
+                if (e.key !== 'Escape') return;
+                if (!document.getElementById('confirm-modal').classList.contains('hidden')) { window.closeConfirmModal(); return; }
+                if (!document.getElementById('habit-modal').classList.contains('hidden')) { window.closeHabitModal(); return; }
+                if (!document.getElementById('note-modal').classList.contains('hidden')) { window.closeNoteModal(); return; }
+            });
+
+            // Long press → open note
+            let lpT;
+            let startY = 0;
+            let startX = 0;
+            
+            const startLongPress = (e) => {
+                const swipeEl = e.target.closest('.swipe-item');
+                if(!swipeEl || e.target.closest('.no-swipe')) return;
+                
+                const p = e.touches ? e.touches[0] : e;
+                startX = p.clientX;
+                startY = p.clientY;
+                
+                lpT = setTimeout(() => { 
+                    window.openNoteModal(swipeEl.dataset.hid, swipeEl.dataset.date); 
+                }, 600);
+            };
+            
+            const cancelLongPressMove = (e) => {
+                if(!lpT) return;
+                const p = e.touches ? e.touches[0] : e;
+                if(Math.abs(p.clientX - startX) > 10 || Math.abs(p.clientY - startY) > 10) {
+                    clearTimeout(lpT);
+                    lpT = null;
+                }
+            };
+            
+            const cancelLongPress = () => { clearTimeout(lpT); lpT = null; };
+
+            document.addEventListener('mousedown', startLongPress);
+            document.addEventListener('mousemove', cancelLongPressMove);
+            document.addEventListener('mouseup', cancelLongPress);
+            
+            document.addEventListener('touchstart', startLongPress, {passive:true});
+            document.addEventListener('touchmove', cancelLongPressMove, {passive:true});
+            document.addEventListener('touchend', cancelLongPress);
+            document.addEventListener('touchcancel', cancelLongPress);
+        }
+        
+        window.onload = initApp;
+    </script>
+</body>
+</html>
